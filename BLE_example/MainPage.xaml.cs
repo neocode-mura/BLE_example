@@ -60,6 +60,7 @@ namespace BLE_example
             }
         }
 
+
         private void PairButton_Click(object sender, RoutedEventArgs e)
         {
 
