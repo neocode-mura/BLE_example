@@ -5,7 +5,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
 using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Devices.Enumeration;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -31,6 +33,15 @@ namespace BLE_example
         private ObservableCollection<BluetoothLEDeviceDisplay> KnownDevices = new ObservableCollection<BluetoothLEDeviceDisplay>();
         private List<DeviceInformation> UnknownDevices = new List<DeviceInformation>();
         private DeviceWatcher deviceWatcher;
+        private BluetoothLEDevice bluetoothLeDevice = null;
+        private BluetoothLEDeviceDisplay bleDeviceDisplay = null;
+        private bool subscribedForNotifications = false;
+        private GattCharacteristic registeredCharacteristic;
+
+        #region Error Codes
+        readonly int E_DEVICE_NOT_AVAILABLE = unchecked((int)0x800710df); // HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE)
+        #endregion
+
 
         #region UI Code
 
@@ -60,42 +71,68 @@ namespace BLE_example
             }
         }
 
+        private void ItemListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            bleDeviceDisplay = ResultsListView.SelectedItem as BluetoothLEDeviceDisplay;
+            if(bleDeviceDisplay != null)
+            {
+                PairButton.IsEnabled = !bleDeviceDisplay.DeviceInformation.Pairing.IsPaired;
+                ConnectButton.IsEnabled = (bool?)bleDeviceDisplay.DeviceInformation.Properties["System.Devices.Aep.IsConnected"] == false;
+            }
+        }
 
         private void PairButton_Click(object sender, RoutedEventArgs e)
         {
 
         }
 
-        private void ConnectButton_Click(object sender, RoutedEventArgs e)
+        private async void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
+            ConnectButton.IsEnabled = false;
 
-        }
-        private void ItemListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var bleDeviceDisplay = ResultsListView.SelectedItem as BluetoothLEDeviceDisplay;
-            if(bleDeviceDisplay != null)
+            ClearBluetoothLEDeviceAsync();
+
+            try
             {
-                PairButton.IsEnabled = !bleDeviceDisplay.DeviceInformation.Pairing.IsPaired;
-                ConnectButton.IsEnabled = (bool?)bleDeviceDisplay.DeviceInformation.Properties["System.Devices.Aep.IsConnected"] == false;
-                //public class BluetoothLEDeviceDisplay : INotifyPropertyChanged
-                //        {
-                //            public BluetoothLEDeviceDisplay(DeviceInformation deviceInfoIn)
-                //            {
-                //                DeviceInformation = deviceInfoIn;
-                //                UpdateGlyphBitmapImage();
-                //            }
+                // BT_Code: BluetoothLEDevice.FromIdAsync must be called from a UI thread because it may prompt for consent.
+                bluetoothLeDevice = await BluetoothLEDevice.FromIdAsync(bleDeviceDisplay.Id);
 
-                //            public DeviceInformation DeviceInformation { get; private set; }
-
-                //            public string Id => DeviceInformation.Id;
-                //            public string Name => DeviceInformation.Name;
-                //            public bool IsPaired => DeviceInformation.Pairing.IsPaired;
-                //            public bool IsConnected => (bool?)DeviceInformation.Properties["System.Devices.Aep.IsConnected"] == true;
-                //            public bool IsConnectable => (bool?)DeviceInformation.Properties["System.Devices.Aep.Bluetooth.Le.IsConnectable"] == true;
-
+                if (bluetoothLeDevice == null)
+                {
+                    NotifyUser("Failed to connect to device.", NotifyType.ErrorMessage);
+                }
             }
-        }
+            catch (Exception ex) when (ex.HResult == E_DEVICE_NOT_AVAILABLE)
+            {
+                NotifyUser("Bluetooth radio is not on.", NotifyType.ErrorMessage);
+            }
 
+            if (bluetoothLeDevice != null)
+            {
+                // Note: BluetoothLEDevice.GattServices property will return an empty list for unpaired devices. For all uses we recommend using the GetGattServicesAsync method.
+                // BT_Code: GetGattServicesAsync returns a list of all the supported services of the device (even if it's not paired to the system).
+                // If the services supported by the device are expected to change during BT usage, subscribe to the GattServicesChanged event.
+                GattDeviceServicesResult result = await bluetoothLeDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+
+                if (result.Status == GattCommunicationStatus.Success)
+                {
+                    var services = result.Services;
+                    NotifyUser(String.Format("Found {0} services", services.Count), NotifyType.StatusMessage);
+                    foreach (var service in services)
+                    {
+                        ServiceList.Items.Add(new ComboBoxItem { Content = DisplayHelpers.GetServiceName(service), Tag = service });
+                    }
+                    ConnectButton.Visibility = Visibility.Collapsed;
+                    ServiceList.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    NotifyUser("Device unreachable", NotifyType.ErrorMessage);
+                }
+            }
+            ConnectButton.IsEnabled = true;
+        }
+  
         public void NotifyUser(string strMessage, NotifyType type)
         {
             // If called from the UI thread, then update immediately.
@@ -149,6 +186,19 @@ namespace BLE_example
             StatusMessage,
             ErrorMessage
         };
+        #endregion
+
+        #region Enumerationg Service
+        private void ClearBluetoothLEDeviceAsync()
+        {
+            bluetoothLeDevice?.Dispose();
+            bluetoothLeDevice = null;
+        }
+
+        private async void ServiceList_SelectionChanged()
+        {
+
+        }
         #endregion
 
         #region Device Discovery
@@ -343,6 +393,5 @@ namespace BLE_example
             });
         }
         #endregion
-
     }
 }
