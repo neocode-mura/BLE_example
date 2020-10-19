@@ -30,9 +30,6 @@ using Windows.UI.Xaml.Navigation;
 
 namespace BLE_example
 {
-    /// <summary>
-    /// それ自体で使用できる空白ページまたはフレーム内に移動できる空白ページ。
-    /// </summary>
     public sealed partial class MainPage : Page
     {
         private ObservableCollection<BluetoothLEDeviceDisplay> KnownDevices = new ObservableCollection<BluetoothLEDeviceDisplay>();
@@ -40,8 +37,6 @@ namespace BLE_example
         private DeviceWatcher deviceWatcher;
         private BluetoothLEDevice bluetoothLeDevice = null;
         private BluetoothLEDeviceDisplay bleDeviceDisplay = null;
-        //private bool subscribedForNotifications = false;
-        //private GattCharacteristic registeredCharacteristic;
         private GattPresentationFormat presentationFormat;
         IReadOnlyList<GattCharacteristic> characteristics;
 
@@ -49,21 +44,18 @@ namespace BLE_example
         readonly int E_BLUETOOTH_ATT_WRITE_NOT_PERMITTED = unchecked((int)0x80650003);
         readonly int E_BLUETOOTH_ATT_INVALID_PDU = unchecked((int)0x80650004);
         readonly int E_ACCESSDENIED = unchecked((int)0x80070005);
-        readonly int E_DEVICE_NOT_AVAILABLE = unchecked((int)0x800710df); // HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE)
+        readonly int E_DEVICE_NOT_AVAILABLE = unchecked((int)0x800710df);
         #endregion
 
         #region UI Code
-
         public MainPage()
         {
             this.InitializeComponent();
         }
-
         private void Button_Click(object sender, RoutedEventArgs e)
         {
             Splitter.IsPaneOpen = !Splitter.IsPaneOpen;
         }
-
         private void EnumerateingButton_Click(object sender, RoutedEventArgs e)
         {
             if (deviceWatcher == null)
@@ -79,7 +71,6 @@ namespace BLE_example
                 NotifyUser($"Device watcher stopped.", NotifyType.StatusMessage);
             }
         }
-
         private void ItemListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             bleDeviceDisplay = ResultsListView.SelectedItem as BluetoothLEDeviceDisplay;
@@ -90,110 +81,6 @@ namespace BLE_example
                     && bleDeviceDisplay.DeviceInformation.Pairing.IsPaired;
             }
         }
-
-        private bool isBusy = false;
-
-        private async void PairButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Do not allow a new Pair operation to start if an existing one is in progress.
-            if (isBusy)
-            {
-                return;
-            }
-
-            isBusy = true;
-
-            NotifyUser("Pairing started. Please wait...", NotifyType.StatusMessage);
-            NotifyType type;
-
-            // For more information about device pairing, including examples of
-            // customizing the pairing process, see the DeviceEnumerationAndPairing sample.
-
-            // Capture the current selected item in case the user changes it while we are pairing.
-            var bleDeviceDisplay = ResultsListView.SelectedItem as BluetoothLEDeviceDisplay;
-
-            // BT_Code: Pair the currently selected device.
-            DevicePairingResult result = await bleDeviceDisplay.DeviceInformation.Pairing.PairAsync();
-            if(result.Status == DevicePairingResultStatus.Paired || result.Status == DevicePairingResultStatus.AlreadyPaired)
-            {
-                type = NotifyType.StatusMessage;
-                PairButton.IsEnabled = false;
-                ConnectButton.IsEnabled = true;
-            }
-            else
-            {
-                type = NotifyType.ErrorMessage;
-            }
-            NotifyUser($"Pairing result = {result.Status}", type);
-
-            isBusy = false;
-        }
-
-        private async void ConnectButton_Click(object sender, RoutedEventArgs e)
-        {
-            ConnectButton.IsEnabled = false;
-
-            ClearBluetoothLEDeviceAsync();
-
-            try
-            {
-                // BT_Code: BluetoothLEDevice.FromIdAsync must be called from a UI thread because it may prompt for consent.
-                bluetoothLeDevice = await BluetoothLEDevice.FromIdAsync(bleDeviceDisplay.Id);
-
-                if (bluetoothLeDevice == null)
-                {
-                    NotifyUser("Failed to connect to device.", NotifyType.ErrorMessage);
-                    ConnectButton.IsEnabled = true;                
-                }
-            }
-            catch (Exception ex) when (ex.HResult == E_DEVICE_NOT_AVAILABLE)
-            {
-                NotifyUser("Bluetooth radio is not on.", NotifyType.ErrorMessage);
-                ConnectButton.IsEnabled = true;                
-            }
-
-            if (bluetoothLeDevice != null)
-            {
-                // Note: BluetoothLEDevice.GattServices property will return an empty list for unpaired devices. For all uses we recommend using the GetGattServicesAsync method.
-                // BT_Code: GetGattServicesAsync returns a list of all the supported services of the device (even if it's not paired to the system).
-                // If the services supported by the device are expected to change during BT usage, subscribe to the GattServicesChanged event.
-                GattDeviceServicesResult result = await bluetoothLeDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
-
-                if (result.Status == GattCommunicationStatus.Success)
-                {
-                    var services = result.Services;
-                    string serviceName;
-
-                    foreach (var service in services)
-                    {
-                        serviceName = DisplayHelpers.GetServiceName(service);
-                        if(serviceName.IndexOf("Custom Service") >= 0)
-                        {
-                            NotifyUser("Found custom service", NotifyType.StatusMessage);
-                            //ConnectButton.Visibility = Visibility.Collapsed;
-                            ServiceUUID.Text = DisplayHelpers.GetServiceName(service);
-                            //ServiceUUID.Visibility = Visibility.Visible;
-                            ServiceUUIDBorder.Visibility = Visibility.Visible;
-                            EnumeratingChara(service);
-                            ConnectButton.IsEnabled = false;
-                            break;
-                        }
-                        else
-                        {
-                            NotifyUser("Not found customr service", NotifyType.ErrorMessage);
-                            ConnectButton.IsEnabled = true;                
-                        }
-                    }
-                }
-                else
-                {
-                    NotifyUser("Device unreachable", NotifyType.ErrorMessage);
-                    ConnectButton.IsEnabled = true;                
-                }
-            }
-
-        }
-
         private async void CharacteristicReadButton_Click(object sender, RoutedEventArgs e)
         {
             // BT_Code: Read the actual value from the device by using Uncached.
@@ -232,7 +119,6 @@ namespace BLE_example
                 NotifyUser("No data to write to device", NotifyType.ErrorMessage);
             }
         }
-
         private async void CharacteristicWriteButton_Click(object sender, RoutedEventArgs e)
         {
             if (!String.IsNullOrEmpty(CharacteristicWriteValue.Text))
@@ -246,240 +132,6 @@ namespace BLE_example
             {
                 NotifyUser("No data to write to device", NotifyType.ErrorMessage);
             }
-        }
-
-        private async Task<bool> WriteBufferToCustomCharacteristicAsync(IBuffer buffer)
-        {
-            try
-            {
-                // BT_Code: Writes the value from the buffer to the characteristic.
-                var result = await characteristics[1].WriteValueWithResultAsync(buffer);
-
-                if (result.Status == GattCommunicationStatus.Success)
-                {
-                    NotifyUser("Successfully wrote value to device", NotifyType.StatusMessage);
-                    return true;
-                }
-                else
-                {
-                    NotifyUser($"Write failed: {result.Status}", NotifyType.ErrorMessage);
-                    return false;
-                }
-            }
-            catch (Exception ex) when (ex.HResult == E_BLUETOOTH_ATT_INVALID_PDU)
-            {
-                NotifyUser(ex.Message, NotifyType.ErrorMessage);
-                return false;
-            }
-            catch (Exception ex) when (ex.HResult == E_BLUETOOTH_ATT_WRITE_NOT_PERMITTED || ex.HResult == E_ACCESSDENIED)
-            {
-                // This usually happens when a device reports that it support writing, but it actually doesn't.
-                NotifyUser(ex.Message, NotifyType.ErrorMessage);
-                return false;
-            }
-        }
-
-        private async void EnumeratingChara(GattDeviceService service)
-        {
-            string charaName;
-            characteristics = null;
-            try
-            {
-                var accessStatus = await service.RequestAccessAsync();
-                if(accessStatus == DeviceAccessStatus.Allowed)
-                {
-                    var result = await service.GetCharacteristicsAsync(BluetoothCacheMode.Uncached);
-                    if (result.Status == GattCommunicationStatus.Success)
-                    {
-                        characteristics = result.Characteristics;
-                    }
-                    else
-                    {
-                        NotifyUser("Error accessing service.", NotifyType.ErrorMessage);
-                        characteristics = new List<GattCharacteristic>();
-                    }
-                }
-                else
-                {
-                    NotifyUser("Error accessing service.", NotifyType.ErrorMessage);
-                    characteristics = new List<GattCharacteristic>();
-                }
-            }
-            catch(Exception ex)
-            {
-                NotifyUser("Restricted service. Can't read charcteristics:" + ex.Message,NotifyType.ErrorMessage);
-                characteristics = new List<GattCharacteristic>();
-            }
-            var chara = characteristics[0];
-            //foreach(GattCharacteristic c in characteristics)
-            //{
-            charaName = DisplayHelpers.GetCharacteristicName(chara);
-            //    if (charaCount == 0)
-            //    {
-            //        charaCount++;
-            CharaReadUUID.Text = charaName;
-            CharaReadUUIDBorder.Visibility = Visibility.Visible;
-            EnumerationReadDescriptor(chara);
-
-            chara = characteristics[1];
-            charaName = DisplayHelpers.GetCharacteristicName(chara);
-            //    }
-            //    else
-            //    {
-            CharaWriteUUID.Text = charaName;
-            CharaWriteUUIDBorder.Visibility = Visibility.Visible;
-            EnumerationWriteDescriptor(chara);
-            //    }
-            //}
-            CharaReadUUIDBorder.Visibility = Visibility.Visible;
-        }
-
-        private async void EnumerationReadDescriptor(GattCharacteristic chara)
-        {
-            var result = await chara.GetDescriptorsAsync(BluetoothCacheMode.Uncached);
-            if (result.Status != GattCommunicationStatus.Success)
-            {
-                NotifyUser("Descripter read failure:" + result.Status.ToString(), NotifyType.ErrorMessage);
-            }
-            presentationFormat = null;
-            if (chara.PresentationFormats.Count > 0)
-            {
-                if(chara.PresentationFormats.Count.Equals(1))
-                {
-                    presentationFormat = chara.PresentationFormats[0];
-                }
-            }
-            //EnableCharacteristicPanels(chara.CharacteristicProperties);
-            SetVisibility(CharacteristicReadPanel, chara.CharacteristicProperties.HasFlag(GattCharacteristicProperties.Read));
-        }
-        private async void EnumerationWriteDescriptor(GattCharacteristic chara)
-        {
-            var result = await chara.GetDescriptorsAsync(BluetoothCacheMode.Uncached);
-            if (result.Status != GattCommunicationStatus.Success)
-            {
-                NotifyUser("Descripter read failure:" + result.Status.ToString(), NotifyType.ErrorMessage);
-            }
-            SetVisibility(CharacteristicWritePanel,
-                chara.CharacteristicProperties.HasFlag(GattCharacteristicProperties.Write) ||
-                chara.CharacteristicProperties.HasFlag(GattCharacteristicProperties.WriteWithoutResponse));
-            CharacteristicWriteValue.Text = "";
-            //EnableCharacteristicPanels(chara.CharacteristicProperties);
-        }
-
-        private void SetVisibility(UIElement element, bool visible)
-        {
-            element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        //private void EnableCharacteristicPanels(GattCharacteristicProperties properties)
-        //{
-        //    // BT_Code: Hide the controls which do not apply to this characteristic.
-
-
-        //}
-
-        private string FormatValueByPresentation(IBuffer buffer, GattPresentationFormat format)
-        {
-            // BT_Code: For the purpose of this sample, this function converts only UInt32 and
-            // UTF-8 buffers to readable text. It can be extended to support other formats if your app needs them.
-            byte[] data;
-            CryptographicBuffer.CopyToByteArray(buffer, out data);
-            if (format != null)
-            {
-                if (format.FormatType == GattPresentationFormatTypes.UInt32 && data.Length >= 4)
-                {
-                    return BitConverter.ToInt32(data, 0).ToString();
-                }
-                else if (format.FormatType == GattPresentationFormatTypes.Utf8)
-                {
-                    try
-                    {
-                        return Encoding.UTF8.GetString(data);
-                    }
-                    catch (ArgumentException)
-                    {
-                        return "(error: Invalid UTF-8 string)";
-                    }
-                }
-                else
-                {
-                    // Add support for other format types as needed.
-                    return "Unsupported format: " + CryptographicBuffer.EncodeToHexString(buffer);
-                }
-            }
-            else if (data != null)
-            {
-                // We don't know what format to use. Let's try some well-known profiles, or default back to UTF-8.
-                return "Unknown format: " + Encoding.UTF8.GetString(data);
-            }
-            else
-            {
-                return "Empty data received";
-            }
-        }
-
-
-
-        public void NotifyUser(string strMessage, NotifyType type)
-        {
-            // If called from the UI thread, then update immediately.
-            // Otherwise, schedule a task on the UI thread to perform the update.
-            if (Dispatcher.HasThreadAccess)
-            {
-                UpdateStatus(strMessage, type);
-            }
-            else
-            {
-                var task = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => UpdateStatus(strMessage, type));
-            }
-        }
-
-        private void UpdateStatus(string strMessage, NotifyType type)
-        {
-            switch (type)
-            {
-                case NotifyType.StatusMessage:
-                    StatusBorder.Background = new SolidColorBrush(Windows.UI.Colors.Green);
-                    break;
-                case NotifyType.ErrorMessage:
-                    StatusBorder.Background = new SolidColorBrush(Windows.UI.Colors.Red);
-                    break;
-            }
-
-            StatusBlock.Text = strMessage;
-
-            // Collapse the StatusBlock if it has no text to conserve real estate.
-            StatusBorder.Visibility = (StatusBlock.Text != String.Empty) ? Visibility.Visible : Visibility.Collapsed;
-            if (StatusBlock.Text != String.Empty)
-            {
-                StatusBorder.Visibility = Visibility.Visible;
-                StatusPanel.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                StatusBorder.Visibility = Visibility.Collapsed;
-                StatusPanel.Visibility = Visibility.Collapsed;
-            }
-
-			// Raise an event if necessary to enable a screen reader to announce the status update.
-			var peer = FrameworkElementAutomationPeer.FromElement(StatusBlock);
-			if (peer != null)
-			{
-				peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
-			}
-		}
-        public enum NotifyType
-        {
-            StatusMessage,
-            ErrorMessage
-        };
-        #endregion
-
-        #region Enumerationg Service
-        private void ClearBluetoothLEDeviceAsync()
-        {
-            bluetoothLeDevice?.Dispose();
-            bluetoothLeDevice = null;
         }
         #endregion
 
@@ -525,7 +177,6 @@ namespace BLE_example
                 deviceWatcher = null;
             }
         }
-
         private BluetoothLEDeviceDisplay FindBluetoothLEDeviceDisplay(string id)
         {
             foreach (BluetoothLEDeviceDisplay bleDeviceDisplay in KnownDevices)
@@ -537,7 +188,6 @@ namespace BLE_example
             }
             return null;
         }
-
         private DeviceInformation FindUnknownDevices(string id)
         {
             foreach (DeviceInformation bleDeviceInfo in UnknownDevices)
@@ -549,7 +199,6 @@ namespace BLE_example
             }
             return null;
         }
-
         private async void DeviceWatcher_Added(DeviceWatcher sender, DeviceInformation deviceInfo)
         {
             // We must update the collection on the UI thread because the collection is databound to a UI element.
@@ -576,12 +225,10 @@ namespace BLE_example
                                 UnknownDevices.Add(deviceInfo);
                             }
                         }
-
                     }
                 }
             });
         }
-
         private async void DeviceWatcher_Updated(DeviceWatcher sender, DeviceInformationUpdate deviceInfoUpdate)
         {
             // We must update the collection on the UI thread because the collection is databound to a UI element.
@@ -617,7 +264,6 @@ namespace BLE_example
                 }
             });
         }
-
         private async void DeviceWatcher_Removed(DeviceWatcher sender, DeviceInformationUpdate deviceInfoUpdate)
         {
             // We must update the collection on the UI thread because the collection is databound to a UI element.
@@ -646,7 +292,6 @@ namespace BLE_example
                 }
             });
         }
-
         private async void DeviceWatcher_EnumerationCompleted(DeviceWatcher sender, object e)
         {
             // We must update the collection on the UI thread because the collection is databound to a UI element.
@@ -660,7 +305,6 @@ namespace BLE_example
                 }
             });
         }
-
         private async void DeviceWatcher_Stopped(DeviceWatcher sender, object e)
         {
             // We must update the collection on the UI thread because the collection is databound to a UI element.
@@ -675,5 +319,319 @@ namespace BLE_example
             });
         }
         #endregion
+
+        #region Pairing
+        private bool isBusy = false;
+
+        private async void PairButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Do not allow a new Pair operation to start if an existing one is in progress.
+            if (isBusy)
+            {
+                return;
+            }
+
+            isBusy = true;
+
+            NotifyUser("Pairing started. Please wait...", NotifyType.StatusMessage);
+            NotifyType type;
+
+            // For more information about device pairing, including examples of
+            // customizing the pairing process, see the DeviceEnumerationAndPairing sample.
+
+            // Capture the current selected item in case the user changes it while we are pairing.
+            var bleDeviceDisplay = ResultsListView.SelectedItem as BluetoothLEDeviceDisplay;
+
+            // BT_Code: Pair the currently selected device.
+            DevicePairingResult result = await bleDeviceDisplay.DeviceInformation.Pairing.PairAsync();
+            if(result.Status == DevicePairingResultStatus.Paired || result.Status == DevicePairingResultStatus.AlreadyPaired)
+            {
+                type = NotifyType.StatusMessage;
+                PairButton.IsEnabled = false;
+                ConnectButton.IsEnabled = true;
+            }
+            else
+            {
+                type = NotifyType.ErrorMessage;
+            }
+            NotifyUser($"Pairing result = {result.Status}", type);
+
+            isBusy = false;
+        }
+
+        #endregion
+
+        #region Enumerationg Service
+        private void ClearBluetoothLEDeviceAsync()
+        {
+            bluetoothLeDevice?.Dispose();
+            bluetoothLeDevice = null;
+        }
+        private async void ConnectButton_Click(object sender, RoutedEventArgs e)
+        {
+            ConnectButton.IsEnabled = false;
+
+            ClearBluetoothLEDeviceAsync();
+
+            try
+            {
+                // BT_Code: BluetoothLEDevice.FromIdAsync must be called from a UI thread because it may prompt for consent.
+                bluetoothLeDevice = await BluetoothLEDevice.FromIdAsync(bleDeviceDisplay.Id);
+
+                if (bluetoothLeDevice == null)
+                {
+                    NotifyUser("Failed to connect to device.", NotifyType.ErrorMessage);
+                    ConnectButton.IsEnabled = true;                
+                }
+            }
+            catch (Exception ex) when (ex.HResult == E_DEVICE_NOT_AVAILABLE)
+            {
+                NotifyUser("Bluetooth radio is not on.", NotifyType.ErrorMessage);
+                ConnectButton.IsEnabled = true;                
+            }
+
+            if (bluetoothLeDevice != null)
+            {
+                // Note: BluetoothLEDevice.GattServices property will return an empty list for unpaired devices. For all uses we recommend using the GetGattServicesAsync method.
+                // BT_Code: GetGattServicesAsync returns a list of all the supported services of the device (even if it's not paired to the system).
+                // If the services supported by the device are expected to change during BT usage, subscribe to the GattServicesChanged event.
+                GattDeviceServicesResult result = await bluetoothLeDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+
+                if (result.Status == GattCommunicationStatus.Success)
+                {
+                    var services = result.Services;
+                    string serviceName;
+
+                    foreach (var service in services)
+                    {
+                        serviceName = DisplayHelpers.GetServiceName(service);
+                        if(serviceName.IndexOf("Custom Service") >= 0)
+                        {
+                            NotifyUser("Found custom service", NotifyType.StatusMessage);
+                            ServiceUUID.Text = DisplayHelpers.GetServiceName(service);
+                            ServiceUUIDBorder.Visibility = Visibility.Visible;
+                            EnumeratingChara(service);
+                            ConnectButton.IsEnabled = false;
+                            break;
+                        }
+                        else
+                        {
+                            NotifyUser("Not found customr service", NotifyType.ErrorMessage);
+                            ConnectButton.IsEnabled = true;                
+                        }
+                    }
+                }
+                else
+                {
+                    NotifyUser("Device unreachable", NotifyType.ErrorMessage);
+                    ConnectButton.IsEnabled = true;                
+                }
+            }
+
+        }
+        #endregion
+
+        #region Enumerating Characteristics
+        private async void EnumeratingChara(GattDeviceService service)
+        {
+            string charaName;
+            characteristics = null;
+            try
+            {
+                var accessStatus = await service.RequestAccessAsync();
+                if(accessStatus == DeviceAccessStatus.Allowed)
+                {
+                    var result = await service.GetCharacteristicsAsync(BluetoothCacheMode.Uncached);
+                    if (result.Status == GattCommunicationStatus.Success)
+                    {
+                        characteristics = result.Characteristics;
+                    }
+                    else
+                    {
+                        NotifyUser("Error accessing service.", NotifyType.ErrorMessage);
+                        characteristics = new List<GattCharacteristic>();
+                    }
+                }
+                else
+                {
+                    NotifyUser("Error accessing service.", NotifyType.ErrorMessage);
+                    characteristics = new List<GattCharacteristic>();
+                }
+            }
+            catch(Exception ex)
+            {
+                NotifyUser("Restricted service. Can't read charcteristics:" + ex.Message,NotifyType.ErrorMessage);
+                characteristics = new List<GattCharacteristic>();
+            }
+            var chara = characteristics[0];
+            charaName = DisplayHelpers.GetCharacteristicName(chara);
+            CharaReadUUID.Text = charaName;
+            CharaReadUUIDBorder.Visibility = Visibility.Visible;
+            EnumerationReadDescriptor(chara);
+
+            chara = characteristics[1];
+            charaName = DisplayHelpers.GetCharacteristicName(chara);
+            CharaWriteUUID.Text = charaName;
+            CharaWriteUUIDBorder.Visibility = Visibility.Visible;
+            EnumerationWriteDescriptor(chara);
+            CharaReadUUIDBorder.Visibility = Visibility.Visible;
+        }
+        #endregion
+
+        private async void EnumerationReadDescriptor(GattCharacteristic chara)
+        {
+            var result = await chara.GetDescriptorsAsync(BluetoothCacheMode.Uncached);
+            if (result.Status != GattCommunicationStatus.Success)
+            {
+                NotifyUser("Descripter read failure:" + result.Status.ToString(), NotifyType.ErrorMessage);
+            }
+            presentationFormat = null;
+            if (chara.PresentationFormats.Count > 0)
+            {
+                if(chara.PresentationFormats.Count.Equals(1))
+                {
+                    presentationFormat = chara.PresentationFormats[0];
+                }
+            }
+            SetVisibility(CharacteristicReadPanel, chara.CharacteristicProperties.HasFlag(GattCharacteristicProperties.Read));
+        }
+        private async void EnumerationWriteDescriptor(GattCharacteristic chara)
+        {
+            var result = await chara.GetDescriptorsAsync(BluetoothCacheMode.Uncached);
+            if (result.Status != GattCommunicationStatus.Success)
+            {
+                NotifyUser("Descripter read failure:" + result.Status.ToString(), NotifyType.ErrorMessage);
+            }
+            SetVisibility(CharacteristicWritePanel,
+                chara.CharacteristicProperties.HasFlag(GattCharacteristicProperties.Write) ||
+                chara.CharacteristicProperties.HasFlag(GattCharacteristicProperties.WriteWithoutResponse));
+            CharacteristicWriteValue.Text = "";
+        }
+        private async Task<bool> WriteBufferToCustomCharacteristicAsync(IBuffer buffer)
+        {
+            try
+            {
+                // BT_Code: Writes the value from the buffer to the characteristic.
+                var result = await characteristics[1].WriteValueWithResultAsync(buffer);
+
+                if (result.Status == GattCommunicationStatus.Success)
+                {
+                    NotifyUser("Successfully wrote value to device", NotifyType.StatusMessage);
+                    return true;
+                }
+                else
+                {
+                    NotifyUser($"Write failed: {result.Status}", NotifyType.ErrorMessage);
+                    return false;
+                }
+            }
+            catch (Exception ex) when (ex.HResult == E_BLUETOOTH_ATT_INVALID_PDU)
+            {
+                NotifyUser(ex.Message, NotifyType.ErrorMessage);
+                return false;
+            }
+            catch (Exception ex) when (ex.HResult == E_BLUETOOTH_ATT_WRITE_NOT_PERMITTED || ex.HResult == E_ACCESSDENIED)
+            {
+                // This usually happens when a device reports that it support writing, but it actually doesn't.
+                NotifyUser(ex.Message, NotifyType.ErrorMessage);
+                return false;
+            }
+        }
+        private void SetVisibility(UIElement element, bool visible)
+        {
+            element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
+        private string FormatValueByPresentation(IBuffer buffer, GattPresentationFormat format)
+        {
+            // BT_Code: For the purpose of this sample, this function converts only UInt32 and
+            // UTF-8 buffers to readable text. It can be extended to support other formats if your app needs them.
+            byte[] data;
+            CryptographicBuffer.CopyToByteArray(buffer, out data);
+            if (format != null)
+            {
+                if (format.FormatType == GattPresentationFormatTypes.UInt32 && data.Length >= 4)
+                {
+                    return BitConverter.ToInt32(data, 0).ToString();
+                }
+                else if (format.FormatType == GattPresentationFormatTypes.Utf8)
+                {
+                    try
+                    {
+                        return Encoding.UTF8.GetString(data);
+                    }
+                    catch (ArgumentException)
+                    {
+                        return "(error: Invalid UTF-8 string)";
+                    }
+                }
+                else
+                {
+                    // Add support for other format types as needed.
+                    return "Unsupported format: " + CryptographicBuffer.EncodeToHexString(buffer);
+                }
+            }
+            else if (data != null)
+            {
+                // We don't know what format to use. Let's try some well-known profiles, or default back to UTF-8.
+                return "Unknown format: " + Encoding.UTF8.GetString(data);
+            }
+            else
+            {
+                return "Empty data received";
+            }
+        }
+        public void NotifyUser(string strMessage, NotifyType type)
+        {
+            // If called from the UI thread, then update immediately.
+            // Otherwise, schedule a task on the UI thread to perform the update.
+            if (Dispatcher.HasThreadAccess)
+            {
+                UpdateStatus(strMessage, type);
+            }
+            else
+            {
+                var task = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => UpdateStatus(strMessage, type));
+            }
+        }
+        private void UpdateStatus(string strMessage, NotifyType type)
+        {
+            switch (type)
+            {
+                case NotifyType.StatusMessage:
+                    StatusBorder.Background = new SolidColorBrush(Windows.UI.Colors.Green);
+                    break;
+                case NotifyType.ErrorMessage:
+                    StatusBorder.Background = new SolidColorBrush(Windows.UI.Colors.Red);
+                    break;
+            }
+
+            StatusBlock.Text = strMessage;
+
+            // Collapse the StatusBlock if it has no text to conserve real estate.
+            StatusBorder.Visibility = (StatusBlock.Text != String.Empty) ? Visibility.Visible : Visibility.Collapsed;
+            if (StatusBlock.Text != String.Empty)
+            {
+                StatusBorder.Visibility = Visibility.Visible;
+                StatusPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                StatusBorder.Visibility = Visibility.Collapsed;
+                StatusPanel.Visibility = Visibility.Collapsed;
+            }
+
+			// Raise an event if necessary to enable a screen reader to announce the status update.
+			var peer = FrameworkElementAutomationPeer.FromElement(StatusBlock);
+			if (peer != null)
+			{
+				peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+			}
+		}
+        public enum NotifyType
+        {
+            StatusMessage,
+            ErrorMessage
+        };
+
     }
 }
