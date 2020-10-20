@@ -6,6 +6,6 @@ ESP32-WROVERでBLE通信（Custom Characteristic編)で作成したReadカスタム特性とWrite
 
 詳細は　　
 
-https://neocode.jp/2020/10/13/esp32-wrover-ble-comm-custom-characteristic/
+https://neocode.jp/2020/10/20/esp32-wrover-ble-comm-custom-uwp-app/
 
 を参照下さい。

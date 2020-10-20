@@ -92,8 +92,6 @@ namespace BLE_example
         public bool IsConnected => (bool?)DeviceInformation.Properties["System.Devices.Aep.IsConnected"] == true;
         public bool IsConnectable => (bool?)DeviceInformation.Properties["System.Devices.Aep.Bluetooth.Le.IsConnectable"] == true;
 
-        public IReadOnlyDictionary<string, object> Properties => DeviceInformation.Properties;
-
         public BitmapImage GlyphBitmapImage { get; private set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -268,24 +266,7 @@ namespace BLE_example
         SimpleKeyState = 0xFFE1
     }
 
-    /// <summary>
-    ///     This enum assists in finding a string representation of a BT SIG assigned value for Descriptor UUIDs
-    ///     Reference: https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorsHomePage.aspx
-    /// </summary>
-    public enum GattNativeDescriptorUuid : ushort
-    {
-        CharacteristicExtendedProperties = 0x2900,
-        CharacteristicUserDescription = 0x2901,
-        ClientCharacteristicConfiguration = 0x2902,
-        ServerCharacteristicConfiguration = 0x2903,
-        CharacteristicPresentationFormat = 0x2904,
-        CharacteristicAggregateFormat = 0x2905,
-        ValidRange = 0x2906,
-        ExternalReportReference = 0x2907,
-        ReportReference = 0x2908
-    }
-
-    public static class Utilities
+     public static class Utilities
     {
         /// <summary>
         ///     Converts from standard 128bit UUID to the assigned 32bit UUIDs. Makes it easy to compare services
@@ -299,22 +280,6 @@ namespace BLE_example
             var bytes = uuid.ToByteArray();
             var shortUuid = (ushort) (bytes[0] | (bytes[1] << 8));
             return shortUuid;
-        }
-
-        /// <summary>
-        ///     Converts from a buffer to a properly sized byte array
-        /// </summary>
-        /// <param name="buffer"></param>
-        /// <returns></returns>
-        public static byte[] ReadBufferToBytes(IBuffer buffer)
-        {
-            var dataLength = buffer.Length;
-            var data = new byte[dataLength];
-            using (var reader = DataReader.FromBuffer(buffer))
-            {
-                reader.ReadBytes(data);
-            }
-            return data;
         }
     }
 }
